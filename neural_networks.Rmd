@@ -1,0 +1,204 @@
+---
+title: "Malicious URL analysis - classification with neural networks"
+output: html_notebook
+---
+
+#Libs
+```{r}
+library(tidymodels)
+library(tidyverse)
+library(dplyr)
+library(neuralnet)
+```
+
+#Conhecendo um pouco mais o conjunto de dados
+```{r}
+draw_boxplot <- function(data){ 
+  data |>  
+    pivot_longer(1:ncol(data)-1, names_to="attributes") |>  
+    ggplot(aes(attributes, value, fill=attributes)) + 
+    geom_boxplot() 
+}
+```
+
+
+#Predict
+```{r}
+performance_evaluation <- function(model, test_data, y){ 
+    prediction  <- data.frame(neuralnet::compute(model, data.frame(test_data[,-ncol(test_data)]))$net.result) #Compute: prevê as espécies, ele prevê a possibilidade de cada neurônio de saída
+    labels      <- c(unique(y))
+    pred_laabel <- data.frame(max.col(prediction)) |>  #Captura como resposta o neurônio com a saída mais alta
+                   mutate(prediction=labels[max.col.prediction.]) |>
+                   select(2) |>
+                   unlist() 
+     
+    results     <- table(y, pred_laabel)
+    accuracy    <- (sum(diag(results)) / sum(results))*100
+    precision   <- (diag(results) / rowSums(results))*100
+    recall      <- ((diag(results) / colSums(results)))*100
+    df          <- data.frame(accuracy, precision,recall)
+    print(results)
+    return(df)
+}
+```
+
+#Plot neural newtork
+```{r}
+plotNeuralNetwork <- function(type_url, model) {
+    tiff(paste('neuralNetwork_', type_url, '.tiff', sep="", collapse=NULL), units="in", width=12, height=8, res=300, compression = 'lzw')
+    
+    plot(model_spam, rep = "best", x.entry = NULL, x.out = NULL, radius = 0.30, arrow.length = 0.12, intercept = FALSE,
+         intercept.factor = 0.4, information = TRUE, information.pos = 0.1,
+         col.entry.synapse = "black", col.entry = "darkturquoise", col.hidden = "turquoise4", col.hidden.synapse = "black",
+         col.out = "aquamarine3", col.out.synapse = "black", col.intercept = "blue",
+         fontsize = 6, dimension = 50, show.weights = FALSE)
+    dev.off()
+}
+```
+
+#Spam_BestFirst
+```{r}
+spam <- function() {
+    start_time <- Sys.time()
+    spam <- read_delim("dataset/Spam_BestFirst.csv", col_types = cols(), show_col_types = TRUE,  delim=",")
+    spam <- spam |> mutate(class=as_factor(class))
+    
+    split_data  <- initial_split(spam, prop=0.8)
+    training    <- training(split_data)
+    test        <- testing(split_data)
+    model_spam  <- neuralnet(class~domain_token_count + tld + ldl_getArg + NumberofDotsinURL + delimeter_path + SymbolCount_Domain,
+                             data=training, hidden=c(9,6,3), linear.output = FALSE)
+    
+    plotNeuralNetwork("spam", model_spam)
+    
+    results <- performance_evaluation(model_spam, test, test$class)
+
+    end_time <- Sys.time()
+    
+    print(results)
+    write.csv(results, file = "result_spam.csv")
+    return(end_time - start_time)
+}
+```
+
+#Phishing_BestFirst.csv
+```{r}
+phishing <- function() {
+    start_time <- Sys.time()
+    phishing <- read_delim("dataset/Phishing_BestFirst.csv", col_types = cols(), show_col_types = TRUE,  delim=",")
+    phishing <- phishing |> mutate(class=as_factor(class))
+    
+    split_data     <- initial_split(phishing, prop=0.8)
+    training       <- training(split_data)
+    test           <- testing(split_data)
+    model_phishing <- neuralnet(class~domain_token_count + tld + urlLen + domainlength + fileNameLen + pathurlRatio + NumberofDotsinURL +
+                                    Query_DigitCount + LongestPathTokenLength + delimeter_Domain + delimeter_path + SymbolCount_Domain + Entropy_Domain,
+                             data=training, hidden=c(9,6,3), linear.output = FALSE)
+
+    plotNeuralNetwork("phishing", model_phishing)
+
+    results <- performance_evaluation(model_phishing, test, test$class)
+    
+    end_time <- Sys.time()
+    
+    write.csv(results, file = "result_phishing.csv")
+    print(results)
+    return(end_time - start_time)
+}
+```
+
+#Malware_BestFirst.csv
+```{r}
+malware <- function() {
+    start_time <- Sys.time()
+    malware <- read_delim("dataset/Malware_BestFirst.csv", col_types = cols(), show_col_types = TRUE,  delim=",")
+    malware <- malware |> mutate(class=as_factor(class))
+    
+    split_data     <- initial_split(malware, prop=0.8)
+    training       <- training(split_data)
+    test           <- testing(split_data)
+    
+    model_malware <- neuralnet(class~domain_token_count + tld + urlLen + argDomanRatio + NumberofDotsinURL + NumberRate_Domain +
+                                   SymbolCount_Domain + Entropy_Domain + Entropy_Extension,
+                             data=training, hidden=c(9,6,3), linear.output = FALSE)
+
+    plotNeuralNetwork("malware", model_malware)
+
+    results <- performance_evaluation(model_malware, test, test$class)
+    
+    end_time <- Sys.time()
+    
+    write.csv(results, file = "result_malware.csv")
+    print(results)
+    return(end_time - start_time)
+}
+```
+
+#Defacement_BestFirst.csv
+```{r}
+defacement <- function() {
+    start_time <- Sys.time()
+    defacement <- read_delim("dataset/Defacement_BestFirst.csv", col_types = cols(), show_col_types = TRUE,  delim=",")
+    defacement <- defacement |> mutate(class=as_factor(class))
+    
+    split_data     <- initial_split(defacement, prop=0.8)
+    training       <- training(split_data)
+    test           <- testing(split_data)
+    
+    model_defacement <- neuralnet(class~domain_token_count + avgpathtokenlen + tld + ArgUrlRatio + NumberofDotsinURL +
+                                      Arguments_LongestWordLength + spcharUrl + delimeter_Domain + delimeter_path +
+                                      NumberRate_DirectoryName + SymbolCount_Domain + Entropy_Domain,
+                             data=training, hidden=c(9,6,3), linear.output = FALSE)
+
+    plotNeuralNetwork("defacement", model_defacement)
+
+    results <- performance_evaluation(model_defacement, test, test$class)
+    
+    end_time <- Sys.time()
+    
+    write.csv(results, file = "result_defacement.csv")
+    print(results)
+    return(end_time - start_time)
+}
+```
+
+#All_Infogain.csv (multiclass)
+```{r}
+multiclass <- function() {
+    start_time <- Sys.time()
+    multiclass <- read_delim("dataset/All_Infogain.csv", col_types = cols(), show_col_types = TRUE,  delim=",")
+    multiclass <- multiclass |> mutate(class=as_factor(class))
+    
+    split_data     <- initial_split(multiclass, prop=0.8)
+    training       <- training(split_data)
+    test           <- testing(split_data)
+    
+    model_multiclass <- neuralnet(class~avgpathtokenlen + pathurlRatio + ArgUrlRatio + argDomanRatio + domainUrlRatio +
+                                      pathDomainRatio + argPathRatio + CharacterContinuityRate + NumberRate_URL + NumberRate_FileName + 
+                                      NumberRate_AfterPath + Entropy_Domain,
+                             data=training, hidden=c(9,6,3), linear.output = FALSE)
+
+    plotNeuralNetwork("multiclass", model_multiclass)
+
+    results <- performance_evaluation(model_multiclass, test, test$class)
+    
+    end_time <- Sys.time()
+    
+    write.csv(results, file = "result_multiclass.csv")
+    print(results)
+    return(end_time - start_time)
+}
+```
+
+#Main
+```{r}
+time_spam       <- spam()
+time_phishing   <- phishing()
+time_malware    <- malware()
+time_defacement <- defacement()
+time_multiclass <- multiclass()
+time            <- data.frame(time_spam, time_phishing, time_malware, time_defacement, time_multiclass)
+
+write.csv(time, file = "time_models.csv")
+
+```
