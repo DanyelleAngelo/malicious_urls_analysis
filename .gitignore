@@ -2,3 +2,6 @@
 .RData
 .Rapp.history
 .Rhistory
+*.csv
+*.tiff
+models/
