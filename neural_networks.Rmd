@@ -11,6 +11,13 @@ library(dplyr)
 library(neuralnet)
 ```
 
+#Global Vars
+```{r}
+numberExamples <- 3000
+maxNumberExamples <- 10000
+maxIterations <- 200000
+```
+
 #Conhecendo um pouco mais o conjunto de dados
 ```{r}
 draw_boxplot <- function(data){ 
@@ -58,20 +65,22 @@ plotNeuralNetwork <- function(type_url, model) {
 
 #Spam_BestFirst
 ```{r}
-#spam <- function() {
+spam <- function() {
     start_time <- Sys.time()
     spam <- read_delim("dataset/Spam_BestFirst.csv", col_types = cols(), show_col_types = TRUE,  delim=",")
+    spam <- spam |> sample_n(numberExamples)
     spam <- spam |> mutate(class=as_factor(class))
     spam <- spam |> mutate(across(1:6, scale))
     spam <- spam |> mutate(across(c(domain_token_count, tld, ldl_getArg, NumberofDotsinURL, delimeter_path, SymbolCount_Domain),
                                 ~squish(.x, quantile(.x, c(0.05, 0.95)))))
     draw_boxplot(spam)
+    spam <- select(spam, -ldl_getArg)
     
     split_data  <- initial_split(spam, prop=0.8)
     training    <- training(split_data)
     test        <- testing(split_data)
-    model_spam  <- neuralnet(class~domain_token_count + tld + ldl_getArg + NumberofDotsinURL + delimeter_path + SymbolCount_Domain,
-                             data=training, hidden=c(6,3), linear.output = FALSE, stepmax=1e6)
+    model_spam  <- neuralnet(class~domain_token_count + tld  + NumberofDotsinURL + delimeter_path + SymbolCount_Domain,
+                             data=training, hidden=10, linear.output = FALSE)
     plotNeuralNetwork("spam", model_spam)
     
     results <- performance_evaluation(model_spam, test, test$class)
@@ -85,31 +94,31 @@ plotNeuralNetwork <- function(type_url, model) {
     write.csv(test, file = "test_spam.csv")
     save(model_spam, file = "models/model_spam.rda")
     
-    print(end_time - start_time)
-#}
+    return(end_time - start_time)
+}
 ```
 
 #Phishing_BestFirst.csv
-#falta
 ```{r}
-#phishing <- function() {
+phishing <- function() {
     start_time <- Sys.time()
     phishing <- read_delim("dataset/Phishing_BestFirst.csv", col_types = cols(), show_col_types = TRUE,  delim=",")
+    phishing <- phishing |> sample_n(numberExamples)
     phishing <- phishing |> mutate(class=as_factor(class))
     phishing <- phishing |> mutate(across(1:13, scale))
     phishing <- phishing |> mutate(across(c(domain_token_count, tld, urlLen, domainlength, fileNameLen,
                                              pathurlRatio, NumberofDotsinURL, Query_DigitCount, LongestPathTokenLength,
                                              delimeter_Domain, delimeter_path, SymbolCount_Domain, Entropy_Domain),
                                             ~squish(.x, quantile(.x, c(0.05, 0.95)))))
-
+    phishing <- select(phishing, -Query_DigitCount)
     draw_boxplot(phishing)
     
     split_data     <- initial_split(phishing, prop=0.8)
     training       <- training(split_data)
     test           <- testing(split_data)
     model_phishing <- neuralnet(class~domain_token_count + tld + urlLen + domainlength + fileNameLen + pathurlRatio + NumberofDotsinURL +
-                                    Query_DigitCount + LongestPathTokenLength + delimeter_Domain + delimeter_path + SymbolCount_Domain + Entropy_Domain,
-                             data=training, hidden=c(6,3), linear.output = FALSE, stepmax=1e6)
+                                     LongestPathTokenLength + delimeter_Domain + delimeter_path + SymbolCount_Domain + Entropy_Domain,
+                             data=training, hidden=10, linear.output = FALSE)
 
     plotNeuralNetwork("phishing", model_phishing)
 
@@ -124,29 +133,31 @@ plotNeuralNetwork <- function(type_url, model) {
     write.csv(test, file = "test_phishing.csv")
     save(model_phishing, file = "models/model_phishing.rda")
     
-    print(end_time - start_time)
-#}
+    return(end_time - start_time)
+}
 ```
 
 #Malware_BestFirst.csv
 ```{r}
-#malware <- function() {
+malware <- function() {
     start_time <- Sys.time()
     malware <- read_delim("dataset/Malware_BestFirst.csv", col_types = cols(), show_col_types = TRUE,  delim=",")
+    malware <- malware |> sample_n(numberExamples)
     malware <- malware |> mutate(class=as_factor(class))
     malware <- malware |> mutate(across(1:9, scale))
     malware <- malware |> mutate(across(c(domain_token_count, tld, urlLen, argDomanRatio, NumberofDotsinURL, NumberRate_Domain,
                                           SymbolCount_Domain, Entropy_Domain, Entropy_Extension),
                                           ~squish(.x, quantile(.x, c(0.05, 0.95)))))
     draw_boxplot(malware)
+    malware <- select(malware, -NumberRate_Domain)
     
     split_data     <- initial_split(malware, prop=0.8)
     training       <- training(split_data)
     test           <- testing(split_data)
     
-    model_malware <- neuralnet(class~domain_token_count + tld + urlLen + argDomanRatio + NumberofDotsinURL + NumberRate_Domain +
+    model_malware <- neuralnet(class~domain_token_count + tld + urlLen + argDomanRatio + NumberofDotsinURL  +
                                    SymbolCount_Domain + Entropy_Domain + Entropy_Extension,
-                             data=training, hidden=c(9,3), linear.output = FALSE, stepmax=1000000)
+                             data=training, hidden=5, linear.output = FALSE)
 
     plotNeuralNetwork("malware", model_malware)
 
@@ -161,8 +172,8 @@ plotNeuralNetwork <- function(type_url, model) {
     write.csv(test, file = "test_malware.csv")
     save(model_malware, file = "models/model_malware.rda")
     
-    print(end_time - start_time)
-#}
+    return(end_time - start_time)
+}
 ```
 
 #Defacement_BestFirst.csv
@@ -170,6 +181,7 @@ plotNeuralNetwork <- function(type_url, model) {
 defacement <- function() {
     start_time <- Sys.time()
     defacement <- read_delim("dataset/Defacement_BestFirst.csv", col_types = cols(), show_col_types = TRUE,  delim=",")
+    defacement <- defacement |> sample_n(numberExamples)
     defacement <- defacement |> mutate(class=as_factor(class))
     defacement <- defacement |> mutate(across(c(domain_token_count, avgpathtokenlen, tld, ArgUrlRatio, NumberofDotsinURL,
                                                 Arguments_LongestWordLength, spcharUrl, delimeter_Domain, delimeter_path,
@@ -178,15 +190,24 @@ defacement <- function() {
     defacement <- defacement |> mutate(across(1:12, scale))
     
     draw_boxplot(defacement)
+    defacement <- select(defacement, -delimeter_path)
+    defacement <- select(defacement, -NumberRate_DirectoryName)
     
+    #remove NA
+    defacement = defacement[complete.cases(defacement),]
+    train_idx <- sample(nrow(defacement), 2/3 * nrow(defacement))
+    defacement_train <- defacement[train_idx, ]
+    defacement_test <- defacement[-train_idx, ]
+
+
     split_data     <- initial_split(defacement, prop=0.8)
     training       <- training(split_data)
     test           <- testing(split_data)
     
     model_defacement <- neuralnet(class~domain_token_count + avgpathtokenlen + tld + ArgUrlRatio + NumberofDotsinURL +
-                                      Arguments_LongestWordLength + spcharUrl + delimeter_Domain + delimeter_path +
-                                      NumberRate_DirectoryName + SymbolCount_Domain + Entropy_Domain,
-                             data=training, hidden=c(6,3), linear.output = FALSE)
+                                      Arguments_LongestWordLength + spcharUrl + delimeter_Domain  +
+                                       SymbolCount_Domain + Entropy_Domain,
+                             data=training, hidden=10, linear.output = FALSE)
 
     plotNeuralNetwork("defacement", model_defacement)
 
@@ -210,6 +231,7 @@ defacement <- function() {
 multiclass <- function() {
     start_time <- Sys.time()
     multiclass <- read_delim("dataset/All_Infogain.csv", col_types = cols(), show_col_types = TRUE,  delim=",")
+    multiclass <- multiclass |> sample_n(3000)
     multiclass <- multiclass |> mutate(class=as_factor(class))
     multiclass <- multiclass |> mutate(across(1:12, scale))
     multiclass <- multiclass |> mutate(across(c(avgpathtokenlen, pathurlRatio, ArgUrlRatio, argDomanRatio, domainUrlRatio,
@@ -217,15 +239,16 @@ multiclass <- function() {
                                                 NumberRate_FileName, NumberRate_AfterPath, Entropy_Domain),
                                             ~squish(.x, quantile(.x, c(0.05, 0.95)))))
     draw_boxplot(multiclass)
+    multiclass <- select(multiclass, -argDomanRatio)
     
     split_data     <- initial_split(multiclass, prop=0.8)
     training       <- training(split_data)
     test           <- testing(split_data)
     
-    model_multiclass <- neuralnet(class~avgpathtokenlen + pathurlRatio + ArgUrlRatio + argDomanRatio + domainUrlRatio +
+    model_multiclass <- neuralnet(class~avgpathtokenlen + pathurlRatio + ArgUrlRatio  + domainUrlRatio +
                                       pathDomainRatio + argPathRatio + CharacterContinuityRate + NumberRate_URL + NumberRate_FileName + 
                                       NumberRate_AfterPath + Entropy_Domain,
-                             data=training, hidden=c(9,6,3), linear.output = FALSE)
+                             data=training, hidden=3, linear.output = FALSE)
 
     plotNeuralNetwork("multiclass", model_multiclass)
 
@@ -246,11 +269,11 @@ multiclass <- function() {
 
 #Main
 ```{r}
+time_multiclass <- multiclass()
 time_spam       <- spam()
 time_phishing   <- phishing()
 time_malware    <- malware()
 time_defacement <- defacement()
-time_multiclass <- multiclass()
 
 time            <- data.frame(time_spam, time_phishing, time_malware, time_defacement, time_multiclass)
 write.csv(time, file = "time_models.csv")
